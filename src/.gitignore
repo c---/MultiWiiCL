@@ -1,0 +1,5 @@
+*.o
+MultiWiiCL
+MultiWiiCL.exe
+.lib
+.lib.win32

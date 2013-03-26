@@ -1,0 +1,22 @@
+diff --git a/linenoise.c b/linenoise.c
+index e1fa435..88a385e 100644
+--- a/linenoise.c
++++ b/linenoise.c
+@@ -132,7 +132,7 @@ static int l_historyload(lua_State *L)
+ 
+ static int l_clearscreen(lua_State *L)
+ {
+-    linenoiseClearScreen();
++//    linenoiseClearScreen();
+     return handle_ln_ok(L);
+ }
+ 
+@@ -190,7 +190,7 @@ int luaopen_linenoise(lua_State *L)
+ #if LUA_VERSION_NUM > 501
+     luaL_setfuncs(L,linenoise_funcs,0);
+ #else
+-    luaL_register(L, NULL, linenoise_funcs);
++    luaL_register(L, "linenoise", linenoise_funcs);
+ #endif
+     return 1;
+ }

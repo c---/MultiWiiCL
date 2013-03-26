@@ -1,0 +1,12 @@
+[submodule "ext/luajit"]
+	path = ext/luajit
+	url = http://luajit.org/git/luajit-2.0.git
+[submodule "ext/lua-linenoise"]
+	path = ext/lua-linenoise
+	url = https://github.com/hoelzro/lua-linenoise.git
+[submodule "ext/serial"]
+	path = ext/serial
+	url = https://github.com/wjwwood/serial.git
+[submodule "ext/linenoise"]
+	path = ext/linenoise
+	url = https://github.com/msteveb/linenoise.git

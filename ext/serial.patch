@@ -1,0 +1,13 @@
+diff --git a/src/serial.cc b/src/serial.cc
+index 92ba9b9..fc78f87 100755
+--- a/src/serial.cc
++++ b/src/serial.cc
+@@ -1,6 +1,8 @@
+ /* Copyright 2012 William Woodall and John Harrison */
+ #if !defined(_WIN32) && !defined(__OpenBSD__)
+ # include <alloca.h>
++#else
++# define alloca __builtin_alloca
+ #endif
+ 
+ #include "serial/serial.h"
