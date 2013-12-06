@@ -28,6 +28,7 @@ CFLAGS=-O2 -Wall -m32
 LDFLAGS=-static -s
 LIBS=../ext/luajit/src/libluajit.a
 OBJS=luajit.o serial.o lpeg.o luaserial.o linenoise.o linenoiselib.o
+OUTDIR=.lib/
 
 ifeq "$(SYSTEM)" "Darwin"
    LIBS+=-ldl -lpthread -lm
@@ -36,13 +37,11 @@ ifeq "$(SYSTEM)" "Darwin"
           -fno-stack-protector
    LDFLAGS=-pagezero_size 10000 -image_base 100000000
    OBJS+=serialimpl.o
-   OUTDIR=.lib/
    OUTEXE=$(OUTDIR)MultiWiiCL
    LUAEXE=../ext/luajit/src/luajit
 else
    ifeq "$(SYSTEM)" "mingw"
       OBJS+=winserialimpl.o
-      OUTDIR=.lib/
       OUTEXE=$(OUTDIR)MultiWiiCL.exe
       LUAEXE=../ext/luajit/src/luajit.exe
    else
@@ -50,13 +49,11 @@ else
          CC=i486-mingw32-gcc
          CXX=i486-mingw32-g++
          OBJS+=winserialimpl.o
-         OUTDIR=.lib/
          OUTEXE=$(OUTDIR)MultiWiiCL.exe
          LUAEXE=luajit
       else
          OBJS+=serialimpl.o
          LIBS+=-ldl -lpthread -lm
-         OUTDIR=.lib/
          OUTEXE=$(OUTDIR)MultiWiiCL
          LUAEXE=../ext/luajit/src/luajit
       endif
@@ -78,14 +75,10 @@ $(OUTDIR):
 ifeq "$(SYSTEM)" "Darwin"
 	make -C ../ext/luajit CFLAGS=-mmacosx-version-min=10.6 LDFLAGS=-mmacosx-version-min=10.6 BUILDMODE=static
 else
-ifeq "$(SYSTEM)" "mingw"
-	make -C ../ext/luajit BUILDMODE=static
-else
 ifdef CROSS_MINGW
 	make -C ../ext/luajit HOST_CC="gcc -m32" CROSS=i486-mingw32- TARGET_SYS=Windows BUILDMODE=static
 else
 	make -C ../ext/luajit CC="gcc -m32" BUILDMODE=static
-endif
 endif
 endif
 
