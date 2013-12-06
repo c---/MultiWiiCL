@@ -60,6 +60,7 @@ MSP_BOXNAMES = 116
 MSP_PIDNAMES = 117
 MSP_WP = 118
 MSP_BOXIDS = 119
+MSP_SERVO_CONF = 120
 
 MSP_SET_RAW_RC = 200
 MSP_SET_RAW_GPS = 201
@@ -73,10 +74,12 @@ MSP_RESET_CONF = 208
 MSP_SET_WP = 209
 MSP_SELECT_SETTING = 210
 MSP_SET_HEAD = 211
+MSP_SET_SERVO_CONF = 212
+MSP_SET_MOTOR = 214
 
 MSP_USBLINKER = 239
 
-MSP_SPEK_BIND = 240
+MSP_BIND = 240
 
 MSP_EEPROM_WRITE = 250
 
@@ -342,6 +345,17 @@ function parseResponse(data)
       field = parseBinary("22222222", data)
       local rv = { _type = 'MSP_SERVO' }
       for i=1,#field do table.insert(rv, field[i]) end
+      return rv
+   elseif cmd == MSP_SERVO_CONF then
+      local rv = { _type = 'MSP_SERVO_CONF' }
+      for i=1,56,7 do
+         table.insert(rv, {
+            min = parseInt16(data, i),
+            max = parseInt16(data, i + 2),
+            middle = parseInt16(data, i + 4),
+            rate = parseInt8(data, i + 6),
+         })
+      end
       return rv
    elseif cmd == MSP_MOTOR then
       field = parseBinary("22222222", data)
@@ -674,7 +688,7 @@ output multiple lines of data. Use CTRL-C to stop monitoring.
 
             version = result.version
    
-            if version < 210 or version > 229 then
+            if version < 210 or version > 230 then
                print("WARNING: unsupported version of MultiWii detected")
             end
          end
@@ -763,6 +777,17 @@ MSP_RAW_IMU command
       end,
       "servo()",[[
 MSP_SERVO command
+]]
+   },
+
+   servoconf = {
+      function()
+         local result = parseResponse(sendCmd(MSP_SERVO_CONF))
+         printResult(result)
+         return result
+      end,
+      "servoconf()",[[
+MSP_SERVO_CONF command
 ]]
    },
 
@@ -995,36 +1020,37 @@ MSP_BOXIDS command
                local baud
                ok, baud = result:match("(P%d+:B%d+:R(%d+):PINS:)")
                if ok then
-                  cache_.linkerbaud = tonumber(baud)
+                  if baud == 0 then baud = 115200 end
+                  config_.linkerbaud = tonumber(baud)
                   break
                end
             end
             if not ok then error("Failed `"..result.."'") end
             print("{"..result:sub(1, -2).."}")
-         elseif cache_.linkerbaud and config_.port then
+         elseif config_.linkerbaud and config_.port then
             if cmd == 'read_eeprom' then
                if not param1 then error("need filename") end
                close()
                sleep(1000)
-               os.execute("avrdude -c stk500v2 -b "..cache_.linkerbaud.." -P "..config_.port.." -u -p m8 -U eeprom:r:"..param1..":i")
+               os.execute("avrdude -c stk500v2 -b "..config_.linkerbaud.." -P "..config_.port.." -u -p m8 -U eeprom:r:"..param1..":i")
                open(nil, true)
             elseif cmd == 'read_flash' then
                if not param1 then error("need filename") end
                close()
                sleep(1000)
-               os.execute("avrdude -c stk500v2 -b "..cache_.linkerbaud.." -P "..config_.port.." -u -p m8 -U flash:r:"..param1..":i")
+               os.execute("avrdude -c stk500v2 -b "..config_.linkerbaud.." -P "..config_.port.." -u -p m8 -U flash:r:"..param1..":i")
                open(nil, true)
             elseif cmd == 'write_flash' then
                if not param1 then error("need filename") end
                close()
                sleep(1000)
-               os.execute("avrdude -c stk500v2 -b "..cache_.linkerbaud.." -P "..config_.port.." -u -p m8 -U flash:w:"..param1..":i")
+               os.execute("avrdude -c stk500v2 -b "..config_.linkerbaud.." -P "..config_.port.." -u -p m8 -U flash:w:"..param1..":i")
                open(nil, true)
             elseif cmd == 'write_eeprom' then
                if not param1 then error("need filename") end
                close()
                sleep(1000)
-               os.execute("avrdude -c stk500v2 -b "..cache_.linkerbaud.." -P "..config_.port.." -u -p m8 -U eeprom:w:"..param1..":i")
+               os.execute("avrdude -c stk500v2 -b "..config_.linkerbaud.." -P "..config_.port.." -u -p m8 -U eeprom:w:"..param1..":i")
                open(nil, true)
             else
                flush()
@@ -1045,12 +1071,14 @@ MSP_BOXIDS command
                   error("Unknown command")
                end
 
-               if baud ~= cache_.linkerbaud then
+               if baud == 0 then baud = 115200 end
+
+               if baud ~= config_.linkerbaud then
                   close()
                   config_.baud = baud
                   open(config_.port, config_.baud)
                end
-               cache_.linkerbaud = baud
+               config_.linkerbaud = baud
    
                print("{"..result:sub(1, -2).."}")
             end
@@ -1339,13 +1367,72 @@ MSP_SET_HEAD
 ]]
    },
 
-   spekbind = {
-      function()
-         local result = parseResponse(sendCmd(MSP_SPEK_BIND))
+   setservoconf = {
+      function(data)
+         local out = {}
+         for i=1,8 do
+            if not data[i] then error("Missing #"..i.." entry") end
+            if not data[i].min then error("Missing #"..i.." min value") end
+            if not data[i].max then error("Missing #"..i.." max value") end
+            if not data[i].middle then error("Missing #"..i.." middle value") end
+            if not data[i].rate then error("Missing #"..i.." rate value") end
+            table.insert(out, writeInt16(data[i].min))
+            table.insert(out, writeInt16(data[i].max))
+            table.insert(out, writeInt16(data[i].middle))
+            table.insert(out, writeInt8(data[i].rate))
+         end
+
+         local result = parseResponse(sendCmd(MSP_SET_SERVO_CONF, table.concat(out)))
          printResult(result)
       end,
-      "spekbind()",[[
-MSP_SPEK_BIND command
+      "setservoconf(data)",[[
+MSP_SET_SERVO_CONF
+`data' should be an array with 8 entries consisting of min, max, middle,
+and rate values. Same format as returned from the servoconf() command.
+
+Example:
+   data = {
+      { min = 0, max = 0, middle = 0, rate = 0 },
+      { min = 0, max = 0, middle = 0, rate = 0 },
+      { min = 0, max = 0, middle = 0, rate = 0 },
+      { min = 0, max = 0, middle = 0, rate = 0 },
+      { min = 0, max = 0, middle = 0, rate = 0 },
+      { min = 0, max = 0, middle = 0, rate = 0 },
+      { min = 0, max = 0, middle = 0, rate = 0 },
+      { min = 0, max = 0, middle = 0, rate = 0 },
+   }
+   setservoconf(data)
+]]
+   },
+
+   setmotor = {
+      function(data)
+         local out = {}
+         for i=1,8 do
+            if not data[i] then error("Missing motor "..i.." data") end
+            table.insert(out, writeInt16(data[i]))
+         end
+         
+         local result = parseResponse(sendCmd(MSP_SET_MOTOR, table.concat(out)))
+         printResult(result)
+      end,
+      "setmotor(motor_data)",[[
+MSP_SET_MOTOR
+`motor_data' should be an array of eight 16-bit values.
+
+Example:
+   data = { 0, 0, 0, 0, 0, 0, 0, 0 }
+   setmotor(data)
+]]
+   },
+
+   bind = {
+      function()
+         local result = parseResponse(sendCmd(MSP_BIND))
+         printResult(result)
+      end,
+      "bind()",[[
+MSP_BIND command
 ]]
    },
 
@@ -1386,6 +1473,7 @@ MSP_DEBUG command
          local pid = parseResponse(sendCmd(MSP_PID))
          local box = parseResponse(sendCmd(MSP_BOX))
          local tune = parseResponse(sendCmd(MSP_RC_TUNING))
+         tune._type = nil
          local data = {pid={},box={},tune=tune}
          local names = getPIDNames()
          for k,v in ipairs(pid) do data.pid[names[k]] = v end
